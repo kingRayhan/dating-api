@@ -3,8 +3,6 @@ using api.Data;
 using api.DTOs;
 using api.Entities;
 using api.Interfaces;
-using api.Shared;
-using api.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,11 +13,13 @@ namespace api.Controllers
     {
         private readonly DataContext _dataContext;
         private readonly ITokenService _tokenService;
+        private readonly IPasswordHashingService _passwordHashingService;
 
-        public AccountController(DataContext dataContext, ITokenService tokenService)
+        public AccountController(DataContext dataContext, ITokenService tokenService, IPasswordHashingService passwordHashingService)
         {
             _dataContext = dataContext;
             _tokenService = tokenService;
+            _passwordHashingService = passwordHashingService;
         }
 
 
@@ -27,13 +27,13 @@ namespace api.Controllers
         public async Task<dynamic> Register([FromBody] RegisterDto payload)
         {
             if (await UserExists(username: payload.UserName))
-                return BadRequest(new BaseResponse<string>()
+                return BadRequest(new BaseResponseDto<string>()
                 {
                     message = "Username is taken",
                     statusCode = 400
                 });
 
-            var password = PasswordService.HashPassword(password: payload.Password);
+            var password = _passwordHashingService.HashPassword(password: payload.Password);
 
             var user = new User()
             {
@@ -45,7 +45,7 @@ namespace api.Controllers
             _dataContext.UserEntity.Add(user);
             await _dataContext.SaveChangesAsync();
 
-            return new BaseResponse<User>()
+            return new BaseResponseDto<User>()
             {
                 message = "User created successfully",
                 data = user,
@@ -59,22 +59,22 @@ namespace api.Controllers
             var user = await _dataContext.UserEntity.FirstOrDefaultAsync(user => user.UserName == payload.UserName);
 
             if (user == null)
-                return Unauthorized(new BaseResponse<string>()
+                return Unauthorized(new BaseResponseDto<string>()
                 {
                     message = "Invalid username or password",
                     statusCode = 401
                 });
 
-            if (!PasswordService.ComparePassword(passwordHash: user.PasswordHash, passwordSalt: user.PasswordSalt,
+            if (!_passwordHashingService.ComparePassword(passwordHash: user.PasswordHash, passwordSalt: user.PasswordSalt,
                     password: payload.Password))
-                return Unauthorized(new BaseResponse<string>()
+                return Unauthorized(new BaseResponseDto<string>()
                 {
                     message = "Invalid username or password",
                     statusCode = 401,
                     data = null
                 });
 
-            return new BaseResponse<UserDto>()
+            return new BaseResponseDto<UserDto>()
             {
                 message = "Login successful",
                 data = new UserDto()
@@ -93,10 +93,13 @@ namespace api.Controllers
             var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var user = await _dataContext.UserEntity.FirstOrDefaultAsync(user => user.UserName == username);
 
-            return new BaseResponse<User>()
+            return new BaseResponseDto<UserDto>()
             {
                 message = "User retrieved successfully",
-                data = user,
+                data = new UserDto()
+                {
+                    Username = user?.UserName
+                },
                 statusCode = 200
             };
         }

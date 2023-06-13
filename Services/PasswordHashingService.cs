@@ -1,11 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
+using api.Interfaces;
 
-namespace api.Utils
+namespace api.Services
 {
-    public class PasswordService
+    public class PasswordHashingService : IPasswordHashingService
     {
-        public static PasswordHashResult HashPassword(string password)
+        public PasswordHashResult HashPassword(string password)
         {
             using var hmac = new HMACSHA512();
             var passwordHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
@@ -18,23 +19,17 @@ namespace api.Utils
             };
         }
 
-        public static bool ComparePassword(byte[] passwordSalt,byte[] passwordHash, string password)
+        public bool ComparePassword(byte[] passwordSalt, byte[] passwordHash, string password)
         {
             using var hmac = new HMACSHA512(passwordSalt);
             var computedHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(password));
-        
+
             for (var i = 0; i < computedHash.Length; i++)
             {
                 if (computedHash[i] != passwordHash[i]) return false;
             }
-        
+
             return true;
         }
-    }
-
-    public class PasswordHashResult
-    {
-        public byte[] PasswordHash { get; set; }
-        public byte[] PasswordSalt { get; set; }
     }
 }
